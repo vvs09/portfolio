@@ -24,12 +24,11 @@ jobs:
           node-version: 20
 
       - name: Install
-        run: npm ci
+        run: npm install
 
       - name: Build
         run: npm run build
 
-      # SPA fallback so direct deep-links work
       - name: SPA fallback
         run: cp dist/index.html dist/404.html
 
