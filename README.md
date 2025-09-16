@@ -160,13 +160,6 @@ This project is open source and available under the [MIT License](LICENSE).
 
 Contributions, issues, and feature requests are welcome! Feel free to check the issues page.
 
-## 📞 Contact
-
-**Vipraghna Srikakulapu**
-- Email: srikakulapu@icloud.com
-- Phone: 904-524-3577
-- Location: North Carolina, USA
-
 ---
 
 Built with ❤️ using React, TypeScript, and modern web technologies.
