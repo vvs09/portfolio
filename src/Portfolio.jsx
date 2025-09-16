@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense, lazy } from "react";
 import { motion, useScroll, useTransform, useReducedMotion } from "framer-motion";
 import {
   Mail, Phone, MapPin, Download, Github, Link as LinkIcon,
   Briefcase, GraduationCap, ShieldCheck, Cpu, Code2, Boxes,
-  Cloud, Database, Rocket, MessageSquare, Terminal, Sun, Moon, Sparkles
+  Cloud, Database, Rocket, MessageSquare, Terminal, Sun, Moon, Sparkles,
+  Menu, X
 } from "lucide-react";
 import {
   Button,
@@ -16,8 +17,13 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger,
-  Separator
+  Separator,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider
 } from "./components/ui";
+import LoadingSpinner from "./components/LoadingSpinner";
 
 const profile = {
   name: "Vipraghna Srikakulapu",
@@ -151,14 +157,19 @@ const fadeIn = {
   show: { opacity: 1, y: 0, transition: { duration: 0.6 } },
 };
 
-function Section({ id, title, children, icon: Icon }) {
+const fadeInReduced = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { duration: 0.3 } },
+};
+
+function Section({ id, title, children, icon: Icon, prefersReduced = false }) {
   return (
     <section id={id} className="scroll-mt-24 py-14 md:py-20">
       <motion.div
         initial="hidden"
         whileInView="show"
         viewport={{ once: true, amount: 0.2 }}
-        variants={fadeIn}
+        variants={prefersReduced ? fadeInReduced : fadeIn}
       >
         <div className="flex items-center gap-3 mb-6">
           {Icon ? (
@@ -176,11 +187,18 @@ function Section({ id, title, children, icon: Icon }) {
   );
 }
 
-function NavLink({ href, label }) {
+function NavLink({ href, label, onClick, isActive = false }) {
   return (
     <a
       href={href}
-      className="text-sm md:text-[15px] px-3 py-2 rounded-xl hover:bg-muted transition-colors"
+      onClick={onClick}
+      className={`text-sm md:text-[15px] px-3 py-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+        isActive 
+          ? 'bg-primary text-primary-foreground' 
+          : 'hover:bg-muted'
+      }`}
+      aria-label={`Navigate to ${label} section`}
+      aria-current={isActive ? 'page' : undefined}
     >
       {label}
     </a>
@@ -216,9 +234,64 @@ export default function Portfolio() {
   const { scrollYProgress } = useScroll();
   const y = useTransform(scrollYProgress, [0, 1], [0, -60]);
   const prefersReduced = useReducedMotion();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [formData, setFormData] = useState({ name: '', email: '', message: '' });
+  const [formStatus, setFormStatus] = useState('idle'); // idle, submitting, success, error
+  const [activeSection, setActiveSection] = useState('home');
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Track active section for navigation highlighting
+  useEffect(() => {
+    const sections = ['home', 'about', 'experience', 'projects', 'skills', 'education', 'contact'];
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setActiveSection(entry.target.id);
+          }
+        });
+      },
+      { threshold: 0.3, rootMargin: '-100px 0px -100px 0px' }
+    );
+
+    sections.forEach((id) => {
+      const element = document.getElementById(id);
+      if (element) observer.observe(element);
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Simulate initial loading
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="text-center"
+        >
+          <LoadingSpinner size="lg" className="mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading portfolio...</p>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="">
+      {/* Scroll Progress Indicator */}
+      <motion.div
+        className="fixed top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 to-rose-500 z-50 origin-left"
+        style={{ scaleX: scrollYProgress }}
+      />
+      
       <div
         className="min-h-screen bg-background text-foreground antialiased"
         style={{
@@ -231,38 +304,92 @@ export default function Portfolio() {
           <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
             <a
               href="#home"
-              className="font-medium tracking-tight text-sm md:text-base"
+              className="font-medium tracking-tight text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-lg"
+              aria-label="Go to home section"
             >
               Vipraghna
             </a>
 
-            <nav className="hidden md:flex items-center">
-              <NavLink href="#about" label="About" />
-              <NavLink href="#experience" label="Experience" />
-              <NavLink href="#projects" label="Projects" />
-              <NavLink href="#skills" label="Skills" />
-              <NavLink href="#education" label="Education" />
-              <NavLink href="#contact" label="Contact" />
+            {/* Desktop Navigation */}
+            <nav className="hidden md:flex items-center" role="navigation" aria-label="Main navigation">
+              <NavLink href="#about" label="About" isActive={activeSection === 'about'} />
+              <NavLink href="#experience" label="Experience" isActive={activeSection === 'experience'} />
+              <NavLink href="#projects" label="Projects" isActive={activeSection === 'projects'} />
+              <NavLink href="#skills" label="Skills" isActive={activeSection === 'skills'} />
+              <NavLink href="#education" label="Education" isActive={activeSection === 'education'} />
+              <NavLink href="#contact" label="Contact" isActive={activeSection === 'contact'} />
             </nav>
 
             <div className="flex items-center gap-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setDark(!dark)}
+                      aria-label={`Switch to ${dark ? 'light' : 'dark'} mode`}
+                    >
+                      {dark ? (
+                        <Sun className="h-4 w-4" />
+                      ) : (
+                        <Moon className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Toggle theme</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              
+              {/* Mobile Menu Button */}
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => setDark(!dark)}
-                title="Toggle theme"
+                className="md:hidden"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                aria-label="Toggle mobile menu"
+                aria-expanded={mobileMenuOpen}
               >
-                {dark ? (
-                  <Sun className="h-4 w-4" />
+                {mobileMenuOpen ? (
+                  <X className="h-4 w-4" />
                 ) : (
-                  <Moon className="h-4 w-4" />
+                  <Menu className="h-4 w-4" />
                 )}
               </Button>
-              <a href="#contact">
+              
+              <a href="#contact" className="hidden md:block">
                 <Button className="">Hire Me</Button>
               </a>
             </div>
           </div>
+          
+          {/* Mobile Navigation */}
+          {mobileMenuOpen && (
+            <motion.nav
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="md:hidden border-t bg-background/95 backdrop-blur"
+              role="navigation"
+              aria-label="Mobile navigation"
+            >
+              <div className="px-4 py-3 space-y-2">
+                <NavLink href="#about" label="About" onClick={() => setMobileMenuOpen(false)} />
+                <NavLink href="#experience" label="Experience" onClick={() => setMobileMenuOpen(false)} />
+                <NavLink href="#projects" label="Projects" onClick={() => setMobileMenuOpen(false)} />
+                <NavLink href="#skills" label="Skills" onClick={() => setMobileMenuOpen(false)} />
+                <NavLink href="#education" label="Education" onClick={() => setMobileMenuOpen(false)} />
+                <NavLink href="#contact" label="Contact" onClick={() => setMobileMenuOpen(false)} />
+                <div className="pt-2">
+                  <a href="#contact">
+                    <Button className="w-full">Hire Me</Button>
+                  </a>
+                </div>
+              </div>
+            </motion.nav>
+          )}
         </header>
 
         {/* Hero */}
@@ -274,7 +401,7 @@ export default function Portfolio() {
               transition={{ duration: 0.7 }}
               style={{ y }}
             >
-              <h1 className="text-4xl md:text-7xl font-semibold tracking-tight">
+              <h1 className="text-4xl md:text-7xl font-semibold tracking-tight" role="banner">
                 {profile.name}
               </h1>
               <p className="mt-3 text-base md:text-lg text-muted-foreground flex items-center gap-2">
@@ -286,12 +413,12 @@ export default function Portfolio() {
               </p>
 
               <div className="mt-6 flex flex-wrap items-center gap-3">
-                <a href="/vipraghna-resume.pdf" download>
+                <a href="/vipraghna-resume.pdf" download aria-label="Download resume PDF">
                   <Button>
                     <Download className="h-4 w-4 mr-2" /> Download Resume
                   </Button>
                 </a>
-                <a href="#projects">
+                <a href="#projects" aria-label="Learn more about projects">
                   <Button variant="outline">Learn more</Button>
                 </a>
                 {profile.links.map((l) => (
@@ -300,6 +427,7 @@ export default function Portfolio() {
                     href={l.href}
                     target="_blank"
                     rel="noreferrer"
+                    aria-label={`Visit ${l.label} profile`}
                   >
                     <Button variant="ghost" className="gap-2">
                       <l.icon className="h-4 w-4" /> {l.label}
@@ -329,7 +457,7 @@ export default function Portfolio() {
           <Separator className="my-12" />
 
           {/* About */}
-          <Section id="about" title="About" icon={Rocket}>
+          <Section id="about" title="About" icon={Rocket} prefersReduced={prefersReduced}>
             <div className="grid md:grid-cols-3 gap-6">
               <Card className="md:col-span-2">
                 <CardContent className="pt-6 text-sm md:text-[15px] leading-7 text-muted-foreground">
@@ -364,7 +492,7 @@ export default function Portfolio() {
           <Separator className="my-12" />
 
           {/* Experience */}
-          <Section id="experience" title="Experience" icon={Briefcase}>
+          <Section id="experience" title="Experience" icon={Briefcase} prefersReduced={prefersReduced}>
             <div className="relative pl-6 md:pl-10">
               <div className="absolute left-2 md:left-4 top-0 bottom-0 w-px bg-border" />
               <div className="space-y-8">
@@ -407,7 +535,7 @@ export default function Portfolio() {
           <Separator className="my-12" />
 
           {/* Projects */}
-          <Section id="projects" title="Projects" icon={Rocket}>
+          <Section id="projects" title="Projects" icon={Rocket} prefersReduced={prefersReduced}>
             <div className="grid md:grid-cols-3 gap-6">
               {projects.map((p, i) => (
                 <motion.div
@@ -462,7 +590,7 @@ export default function Portfolio() {
           <Separator className="my-12" />
 
           {/* Skills */}
-          <Section id="skills" title="Skills" icon={Cpu}>
+          <Section id="skills" title="Skills" icon={Cpu} prefersReduced={prefersReduced}>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {skills.map((s) => (
                 <Card key={s.group} className="">
@@ -491,7 +619,7 @@ export default function Portfolio() {
           <Separator className="my-12" />
 
           {/* Education */}
-          <Section id="education" title="Education" icon={GraduationCap}>
+          <Section id="education" title="Education" icon={GraduationCap} prefersReduced={prefersReduced}>
             <Card>
               <CardContent className="py-6 text-sm md:text-[15px] flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div>
@@ -510,7 +638,7 @@ export default function Portfolio() {
           <Separator className="my-12" />
 
           {/* Contact */}
-          <Section id="contact" title="Contact" icon={Mail}>
+          <Section id="contact" title="Contact" icon={Mail} prefersReduced={prefersReduced}>
             <Card>
               <CardContent className="py-6">
                 <div className="grid md:grid-cols-3 gap-6 items-start">
@@ -527,32 +655,90 @@ export default function Portfolio() {
                   </div>
                   <div className="md:col-span-2">
                     <form
-                      onSubmit={(e) => {
+                      onSubmit={async (e) => {
                         e.preventDefault();
-                        alert("Thanks! I'll get back to you soon.");
+                        setFormStatus('submitting');
+                        
+                        try {
+                          // Simulate form submission
+                          await new Promise(resolve => setTimeout(resolve, 1000));
+                          setFormStatus('success');
+                          setFormData({ name: '', email: '', message: '' });
+                          setTimeout(() => setFormStatus('idle'), 3000);
+                        } catch (error) {
+                          setFormStatus('error');
+                          setTimeout(() => setFormStatus('idle'), 3000);
+                        }
                       }}
                       className="grid gap-3"
+                      aria-label="Contact form"
                     >
                       <div className="grid md:grid-cols-2 gap-3">
-                        <input
+                        <div>
+                          <label htmlFor="name" className="sr-only">Your name</label>
+                          <input
+                            id="name"
+                            required
+                            value={formData.name}
+                            onChange={(e) => setFormData({...formData, name: e.target.value})}
+                            placeholder="Your name"
+                            className="w-full px-3 py-2 rounded-xl bg-muted focus:outline-none focus:ring-2 ring-offset-1 ring-primary"
+                            aria-describedby="name-error"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="email" className="sr-only">Your email</label>
+                          <input
+                            id="email"
+                            required
+                            type="email"
+                            value={formData.email}
+                            onChange={(e) => setFormData({...formData, email: e.target.value})}
+                            placeholder="Your email"
+                            className="w-full px-3 py-2 rounded-xl bg-muted focus:outline-none focus:ring-2 ring-offset-1 ring-primary"
+                            aria-describedby="email-error"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label htmlFor="message" className="sr-only">Message</label>
+                        <textarea
+                          id="message"
                           required
-                          placeholder="Your name"
-                          className="px-3 py-2 rounded-xl bg-muted focus:outline-none focus:ring-2 ring-offset-1 ring-primary"
-                        />
-                        <input
-                          required
-                          type="email"
-                          placeholder="Your email"
-                          className="px-3 py-2 rounded-xl bg-muted focus:outline-none focus:ring-2 ring-offset-1 ring-primary"
+                          value={formData.message}
+                          onChange={(e) => setFormData({...formData, message: e.target.value})}
+                          placeholder="Message"
+                          className="w-full min-h-[120px] px-3 py-2 rounded-xl bg-muted focus:outline-none focus:ring-2 ring-offset-1 ring-primary"
+                          aria-describedby="message-error"
                         />
                       </div>
-                      <textarea
-                        required
-                        placeholder="Message"
-                        className="min-h-[120px] px-3 py-2 rounded-xl bg-muted focus:outline-none focus:ring-2 ring-offset-1 ring-primary"
-                      />
-                      <Button type="submit" className="w-fit">
-                        Send Message
+                      
+                      {formStatus === 'success' && (
+                        <div className="text-green-600 text-sm" role="alert">
+                          Thanks! I'll get back to you soon.
+                        </div>
+                      )}
+                      
+                      {formStatus === 'error' && (
+                        <div className="text-red-600 text-sm" role="alert">
+                          Something went wrong. Please try again.
+                        </div>
+                      )}
+                      
+                      <Button 
+                        type="submit" 
+                        className="w-fit" 
+                        disabled={formStatus === 'submitting'}
+                        aria-describedby="submit-status"
+                      >
+                        {formStatus === 'submitting' ? (
+                          <>
+                            <LoadingSpinner size="sm" className="mr-2" />
+                            Sending...
+                          </>
+                        ) : (
+                          'Send Message'
+                        )}
                       </Button>
                     </form>
                   </div>
